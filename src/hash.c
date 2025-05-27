@@ -1,5 +1,6 @@
 #include "hash.h"
 #include <stdbool.h>
+#include <string.h>
 
 #define CAPACIDAD_MINIMA 3
 #define FACTOR_CARGA_MAX 0.7
@@ -90,8 +91,9 @@ bool insertar_valor(hash_t* h, const char* c, void* v, void** a){
     while(!insertado){
         valor_t* valor_en_pos=&h->tabla[posicion];
 
-        if(valor_en_pos->estado == VACIO || valor_en_pos->estado == BORRADO){
-            valor_en_pos->clave=c;
+        if(valor_en_pos->estado == VACIO){ // hay que agregar el caso de que se inserte en una pos borrada
+            valor_en_pos->clave=strdup(c);
+            if (!valor_en_pos->clave) return NULL;
             valor_en_pos->dato=v;
             valor_en_pos->estado=OCUPADO;
             h->ocupado+=1;
@@ -133,4 +135,46 @@ bool hash_insertar(hash_t *h, const char *clave, void *valor, void **anterior){
     }
 
     return insertar_valor(h,clave,valor,anterior);
+}
+
+/**
+ * Busca en la tabla el valor asociado a una clave. En caso de no existir
+ * devuelve NULL.
+ */
+void *hash_buscar(hash_t *h, const char *clave){
+    if (!h || !clave) return NULL;
+
+    size_t posicion=h->hash_func(clave) % h->capacidad; 
+
+    void* dato_buscado=NULL;
+    bool seguir_iterando=true;
+    while (seguir_iterando){
+        valor_t* valor_en_pos=&h->tabla[posicion];
+        if (valor_en_pos->estado == VACIO)
+            seguir_iterando = false;
+        else if (valor_en_pos->estado == OCUPADO && strcmp(clave, valor_en_pos->clave) == 0) {
+            seguir_iterando = false;
+            dato_buscado = valor_en_pos->dato;
+        }
+        if(seguir_iterando)
+            posicion=(posicion+1) % h->capacidad;
+    }
+    return dato_buscado;
+}
+
+/**
+ * Devuelve si existe una clave en la tabla.
+ */
+bool hash_existe(hash_t *h, const char *clave){
+    if (!h || !clave) return false;
+
+    void* dato_buscado=hash_buscar(h,clave);
+    return (dato_buscado == NULL) ? false : true;
+}
+
+/**
+ * Devuelve la cantidad de claves existentes en la tabla.
+ */
+size_t hash_tamanio(hash_t *h){
+    return (h) ? h->ocupado : 0;
 }
