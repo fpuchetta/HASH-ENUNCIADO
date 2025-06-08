@@ -7,6 +7,8 @@
 
 typedef enum estado { VACIO, OCUPADO, BORRADO } estado_t;
 
+enum modo { BUSQUEDA, INSERCION };
+
 typedef struct valor {
 	void *dato;
 	char *clave;
@@ -20,15 +22,6 @@ struct hash {
 	size_t capacidad;
 };
 
-char *my_strdup(const char *s)
-{
-	size_t len = strlen(s) + 1;
-	char *dup = malloc(len);
-	if (dup)
-		memcpy(dup, s, len);
-	return dup;
-}
-
 size_t djb2_hash(const char *str)
 {
 	size_t hash = 5381;
@@ -39,6 +32,56 @@ size_t djb2_hash(const char *str)
 	}
 
 	return hash;
+}
+
+/*
+	Pre: El hash pasado por parametro debe ser valido y haber sido creado previamente
+		 con "hash_crear" o con "hash_crear_con_funcion".
+		 La clave pasada por parametro no debe ser nula.
+		 El modo de eleccion debe ser de tipo BUSQUEDA o INSERCION.
+
+	Post: Si modo es BUSQUEDA, devuelve un puntero al par clave valor
+		  asociado a la clave pasada por parametro.
+		  Devuelve NULL en caso de no encontrarse. 
+
+		  Si modo es INSERCION, devuelve un puntero al par clave valor
+		  asociado a la clave pasada por parametro.
+		  Devuelve la primera posicion de borrado en caso de no encontrarse
+		  Devuelve el primer slot vacio en ultima instancia.
+*/
+valor_t *hash_buscar_pos(hash_t *h, const char *c, enum modo modo_eleccion)
+{
+	size_t pos = h->hash_func(c) % h->capacidad;
+	size_t pos_borrado = h->capacidad;
+
+	valor_t *actual = NULL;
+	bool encontrado = false;
+
+	while (h->tabla[pos].estado != VACIO && !encontrado) {
+		if (h->tabla[pos].estado == OCUPADO &&
+		    strcmp(h->tabla[pos].clave, c) == 0) {
+			actual = &h->tabla[pos];
+			encontrado = true;
+		}
+
+		if (!encontrado && h->tabla[pos].estado == BORRADO &&
+		    pos_borrado == h->capacidad)
+			pos_borrado = pos;
+
+		if (!encontrado)
+			pos = (pos + 1) % h->capacidad;
+	}
+
+	if (modo_eleccion == BUSQUEDA ||
+	    (modo_eleccion == INSERCION && encontrado)) {
+		return actual;
+	}
+
+	if (pos_borrado != h->capacidad) {
+		return &h->tabla[pos_borrado];
+	}
+
+	return &h->tabla[pos];
 }
 
 /*
@@ -59,21 +102,11 @@ void destruir_tabla(valor_t *tabla, size_t capacidad,
 	free(tabla);
 }
 
-/**
- * Crea una tabla de hash de direccionamiento abierto con la capacidad inicial
- * dada. Si la capacidad es menor a 3, se utiliza 3 como capacidad inicial.
- *
- * Devuelve la tabla creada o NULL en caso de error.
- */
 hash_t *hash_crear(size_t capacidad_inicial)
 {
 	return hash_crear_con_funcion(capacidad_inicial, djb2_hash);
 }
 
-/**
- * Igual que hash_crear, pero permite al usuario proveer su propia funcion de hash.
- * La función f no puede ser nula.
- */
 hash_t *hash_crear_con_funcion(size_t capacidad_inicial,
 			       size_t (*f)(const char *))
 {
@@ -97,52 +130,36 @@ hash_t *hash_crear_con_funcion(size_t capacidad_inicial,
 	return hash;
 }
 
-valor_t *buscar_pos_insercion(hash_t *h, const char *c)
-{
-	size_t pos = h->hash_func(c) % h->capacidad;
-	size_t pos_borrado = h->capacidad;
+/*
+	Pre: El parametro "pos_a_insertar" no debe ser nulo, al igual que la clave.
 
-	valor_t *actual = NULL;
-	bool encontrado = false;
-	size_t inicio = pos;
-
-	while (h->tabla[pos].estado != VACIO && !encontrado) {
-		actual = &h->tabla[pos];
-		if (actual->estado == OCUPADO && strcmp(actual->clave, c) == 0)
-			encontrado = true;
-
-		if (actual->estado == BORRADO && pos_borrado == h->capacidad)
-			pos_borrado = pos;
-
-		if (!encontrado) {
-			pos = (pos + 1) % h->capacidad;
-			if (pos == inicio)
-				break;
-		}
-	}
-	if (encontrado)
-		return actual;
-
-	if (pos_borrado != h->capacidad)
-		return &h->tabla[pos_borrado];
-
-	return &h->tabla[pos];
-}
-
+	Post: Devuelve true si se pudo inicializar el par clave valor,
+		  Devuelve false en caso contrario.
+*/
 bool inicializar_pos(valor_t *pos_a_insertar, const char *clave, void *valor)
 {
-	pos_a_insertar->clave = my_strdup(clave);
+	pos_a_insertar->clave = malloc(strlen(clave) + 1);
 	if (!pos_a_insertar->clave)
 		return false;
+
+	strcpy(pos_a_insertar->clave, clave);
 
 	pos_a_insertar->dato = valor;
 	pos_a_insertar->estado = OCUPADO;
 	return true;
 }
 
+/*
+	Pre: El hash pasado por parametro debe ser valido y haber sido creado previamente
+		 con "hash_crear" o con "hash_crear_con_funcion".
+		 La clave pasada por parametro no debe ser nula.
+
+	Post: Devuelve true en caso de que se haya podido insertar el par clave valor,
+		  Devuelve false en caso contrario.
+*/
 bool insertar_valor(hash_t *h, const char *c, void *v, void **a)
 {
-	valor_t *pos_insercion = buscar_pos_insercion(h, c);
+	valor_t *pos_insercion = hash_buscar_pos(h, c, INSERCION);
 
 	if (pos_insercion->estado == OCUPADO &&
 	    strcmp(pos_insercion->clave, c) == 0) {
@@ -160,6 +177,13 @@ bool insertar_valor(hash_t *h, const char *c, void *v, void **a)
 	return true;
 }
 
+/*
+	Pre: El hash pasado por parametro debe ser valido y haber sido creado previamente
+		 con "hash_crear" o con "hash_crear_con_funcion" 
+
+	Post: Devuelve true si se logro rehashear la tabla correctamente
+		  Devuelve false si no se logro rehashear, se vuelve a la tabla anterior.
+*/
 bool hash_rehash(hash_t *h)
 {
 	valor_t *tabla_anterior = h->tabla;
@@ -197,6 +221,13 @@ bool hash_rehash(hash_t *h)
 	return !error_insercion;
 }
 
+/*
+	Pre: El hash pasado por parametro debe haber sido creado previamente con
+		 "hash_crear" o "hash_crear_con_funcion", la clave debe ser un string valido
+		 y la posicion debe estar dentro de los rangos de la tabla.
+
+	Post: Devuelve true si se debe rehashear la tabla, devuelve falso en caso contrario.
+*/
 bool debe_rehashear(hash_t *h, const char *clave, size_t posicion)
 {
 	return (h->tabla[posicion].estado == OCUPADO &&
@@ -205,14 +236,6 @@ bool debe_rehashear(hash_t *h, const char *clave, size_t posicion)
 			FACTOR_CARGA_MAX);
 }
 
-/**
- * Inserta una clave en la tabla y asocia el valor pasado por parámetro.
- *
- * Si previamente existe un valor asociado a esa clave y anterior no es nulo, se
- * guarda un puntero al valor anterior en el puntero.
- *
- * Devuelve true si pudo insertar/actualizar el valor.
- */
 bool hash_insertar(hash_t *h, const char *clave, void *valor, void **anterior)
 {
 	if (!h || !clave)
@@ -228,39 +251,12 @@ bool hash_insertar(hash_t *h, const char *clave, void *valor, void **anterior)
 	return insertar_valor(h, clave, valor, anterior);
 }
 
-/*
-    Pre: El hash debe estar previamente inicializado con "hash_crear" o "hash_crear_con_funcion"
-         La clave pasada por pamaretro no debe ser NULL.
-    Post: Devuelve el par clave-valor de la tabla acorde a la clave ingresada.
-          Devuelve null en caso de no encontrar el par clave-valor.
-*/
-valor_t *buscar_slot_tabla(hash_t *h, const char *c)
-{
-	size_t pos = h->hash_func(c) % h->capacidad;
-
-	valor_t *actual = NULL;
-
-	bool encontrado = false;
-	while (h->tabla[pos].estado != VACIO && !encontrado) {
-		if (h->tabla[pos].estado == OCUPADO &&
-		    strcmp(c, h->tabla[pos].clave) == 0) {
-			actual = &h->tabla[pos];
-			encontrado = true;
-		}
-
-		if (!encontrado)
-			pos = (pos + 1) % h->capacidad;
-	}
-
-	return actual;
-}
-
 void *hash_sacar(hash_t *h, const char *clave)
 {
 	if (!h || !clave)
 		return NULL;
 
-	valor_t *pos_buscada = buscar_slot_tabla(h, clave);
+	valor_t *pos_buscada = hash_buscar_pos(h, clave, BUSQUEDA);
 	if (!pos_buscada)
 		return NULL;
 
@@ -280,7 +276,7 @@ void *hash_buscar(hash_t *h, const char *clave)
 	if (!h || !clave)
 		return NULL;
 
-	valor_t *pos_buscada = buscar_slot_tabla(h, clave);
+	valor_t *pos_buscada = hash_buscar_pos(h, clave, BUSQUEDA);
 	if (!pos_buscada)
 		return NULL;
 
@@ -292,8 +288,9 @@ bool hash_existe(hash_t *h, const char *clave)
 	if (!h || !clave)
 		return false;
 
-	void *dato_buscado = hash_buscar(h, clave);
-	return (dato_buscado == NULL) ? false : true;
+	valor_t *pos_buscada = hash_buscar_pos(h, clave, BUSQUEDA);
+
+	return (pos_buscada == NULL) ? false : true;
 }
 
 size_t hash_tamanio(hash_t *h)
@@ -303,11 +300,7 @@ size_t hash_tamanio(hash_t *h)
 
 void hash_destruir(hash_t *h)
 {
-	if (!h)
-		return;
-
-	destruir_tabla(h->tabla, h->capacidad, NULL);
-	free(h);
+	hash_destruir_todo(h, NULL);
 }
 
 void hash_destruir_todo(hash_t *h, void (*destructor)(void *))
