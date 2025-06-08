@@ -26,7 +26,7 @@ El tda hash implementado funciona mediante la estructura **hash_t** proporcionad
 
 Primero se debe crear el hash mediante el uso de laguna de las 2 funciones ``hash_crear`` o ``hash_crear_con_funcion``.
 
-Luego se pueden insetar pares clave valor, a la vez que realizar busquedas de datos mediante las claves, la eliminacion de datos o la iteracion por claves en la tabla.
+Luego se pueden insertar pares clave valor, a la vez que realizar busquedas de datos mediante las claves, la eliminacion de datos o la iteracion por claves en la tabla.
 
 El manejo de memoria de las claves proporcionadas por el usuario luego de la insercion de las mismas queda a disposicion de dicho usuario. El TDA funcionara correctamente.
 
@@ -68,7 +68,7 @@ Sin embargo existen casos en los que la complejidad es lineal debido al rehash.
 
 El rehash se encarga de reservar una memoria nueva para la tabla en caso de que una insercion a realizar aumente el factor de carga y  haya superado el factor de carga maximo. Luego, al reinsertar todos los elementos se realizan **N veces, una operacion constante** por lo cual, la insercion en el peor de los casos es **O(n)**.
 
-El siguiente diagrama puede mostrar los pases que se siguen a la hora de insertar un par clave-valor en la tabla:
+El siguiente diagrama puede mostrar los pasos que se siguen a la hora de insertar un par clave-valor en la tabla:
 
 <div align="center">
 <img src="img/hash_insertar.png">
@@ -91,8 +91,6 @@ El flujo de una busqueda puede verse asi:
 
 Al igual que las funciones de busqueda e insercion, la complejidad de sacar un par clave-valor de la tabla de hash se torna constante debido a la facilidad que nos provee limitar el tamaño de la tabla y utilizar la funcion de hash.
 
----
-
 De esta forma, podemos decir que la complejidad es **O(1)**.
 
 ---
@@ -101,13 +99,15 @@ De esta forma, podemos decir que la complejidad es **O(1)**.
 
 Las complejidades de dichas funciones son constantes gracias al campo del TDA **ocupado** por parte de hash_tamanio, y para hash_existe, gracias a la funcionalidad que se busca de un hash la cual es la funcion de hash.
 
-De esta forma, se puede decir que las complejidades de ambas funciones son **O(n)**.
+De esta forma, se puede decir que las complejidades de ambas funciones son **O(1)**.
 
 ---
 
 ### hash_destruir y hash_destruir_todo:
 
-Ambas funciones encargas de destruir el TDA en si, tienen una complejida de **O(n)**, siendo N la cantidad de pares insertados en la tabla. Se deben recorrer n elementos y para cada una realizar una accion constante.
+Ambas funciones encargadas de destruir el TDA en si, tienen una complejida de **O(n)**, siendo N la cantidad de pares insertados en la tabla. Se deben recorrer n elementos y para cada una realizar una accion constante.
+
+---
 
 ### hash_iterar_claves:
 
@@ -127,7 +127,7 @@ Un diccionario es un TDA el cual busca guardar pares asociados de clave-valor. D
 
 Un diccionario puede implementarse de diversas formas, en este caso hablaremos de **diccionario como lista enlazada**, **diccionario como tabla de hash** y **diccionario como abb balanceado**
 
-#### Diccionario como lista hash:
+#### Diccionario como tabla de hash:
 
 En primer instancia, un diccionario como tabla de hash consta de una tabla para guardar pares de clave-valor y una funcion de hash la cual provee un numero entre el limite maximo de la tabla.
 
@@ -138,6 +138,12 @@ Aun asi, este tipo de implementacion posee algunas desventajas en comparacion de
 A la hora de utilizar la funcion de hash, se pueden dar **colisiones** si dos claves distintas dan el mismo valor. Esto genera que la busqueda no sea estrictamente O(1) ya que puede tener que realizarse una insercion en un lugar cercano a la posicion dada.
 
 A su vez, las tablas deben ser creadas con una capacidad maxima, por lo cual esto puede generar un gran uso de memoria si la tabla es demasiado grande, y tampoco se mantiene un orden de insercion predefinido.
+
+Esta implementacion se puede ver asi:
+
+<div align="center">
+<img src="img/hash_teorica.png">
+</div>
 
 ---
 
@@ -151,6 +157,12 @@ Por otro lado, las desventajas de dicha implementacion es la complejidad de las 
 
 A su vez, al igual que en un hash, no se mantiene un orden de insercion.
 
+Esta implementacion puede verse asi:
+
+<div align="center">
+<img src="img/lista_teorica.png">
+</div>
+
 ---
 
 #### Diccionario como abb balanceado:
@@ -160,6 +172,12 @@ En un diccionario implementado como un abb balanceado, ya sea AVL o Arbol Rojo-N
 Estas mejoras en base a la lista enlazada se basan en la complejidad de las primitivas de este TDA, debido a que adoptan las complejidades de las primitivas de un ABB balanceado, ya que serian logaritmicas. A su vez, la memoria utilizada es similar al caso de la lista ya que solo se reserva memoria para cada nodo a insertar. Tambien se posee un orden de insercion predefinido, por lo cual la busqueda de elementos tambien se podria dar en orden como la iteracion de dichos elementos.
 
 Aun asi, esta implementacion tambien posee sus desventajas, como por ejemplo el costo de mantener balanceado dicho arbol al momento de insertar o eliminar pares. El acceso a claves es logaritmico pero no se asemeja al acceso constante de un hash, lo cual puede ser perjudicial en abb con muchos pares.
+
+Esta implementacion puede verse asi:
+
+<div align="center">
+<img src="img/abb_teorica.png">
+</div>
 
 ---
 
@@ -191,7 +209,7 @@ Un hash con direccionamiento abierto puede verse asi (con probing lineal):
 <img src="img/hash_dir_abierto.png">
 </div>
 
-Por otro lado, el direccionamiento cerrado es una forma de resolucion de colisiones la cual deja en claro que **el par clave valor estara en el indice dado por la funcion de hash**. De esta forma, lo que se hace con este direccionamiento es guardar en cada indice de la tabla (Vector), un puntero a una estructura elegido, la cual puede ser otro hash, una lista, un abb, etc. Asi, las colisiones iran a parar a dicho indice, para luego insertarse en la estructura apuntada por dicho indice, logrando "agrupar" las colisiones y permitir insertar elementos aun habiendo dado el mismo indice.
+Por otro lado, el direccionamiento cerrado es una forma de resolucion de colisiones la cual deja en claro que **el par clave valor estara en el indice dado por la funcion de hash**. De esta forma, lo que se hace con este direccionamiento es guardar en cada indice de la tabla (Vector), un puntero a una estructura elegida, la cual puede ser otro hash, una lista, un abb, etc. Asi, las colisiones iran a parar a dicho indice, para luego insertarse en la estructura apuntada por dicho indice, logrando "agrupar" las colisiones y permitir insertar elementos aun habiendo dado el mismo indice.
 
 Para mantener este tipo de direccionamiento, se debe reescalar la tabla en caso de que las estructuras apuntadas superen la cantidad de elementos de la misma.
 
